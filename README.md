@@ -22,6 +22,7 @@
 - 相同输入自动去重（7 天 TTL）
 - 支持 `SUB_ACCESS_TOKEN` 访问令牌保护
 - 支持导出：Raw（Base64）/ Clash（YAML）/ Surge（文本）
+- Clash/Mihomo 导出中，对 `www.nicecc.ccwu.cc` 的 Cloudflare 优选 IP、443 端口、WS/TLS 节点自动添加 Chrome 指纹和 ECH；直连源站 IP 不添加
 
 ## 项目结构
 
@@ -173,6 +174,8 @@ curl "https://<worker>/sub/<id>?target=clash&token=<SUB_ACCESS_TOKEN>"
 - `src/worker.js` 当前是 KV 短链方案，不依赖 `SUB_LINK_SECRET`
 - 每条订阅记录默认保存 7 天（TTL）
 - Surge 导出当前仅包含 `vmess` / `trojan`
+- ECH 只用于 Clash/Mihomo 格式；客户端须支持 `ech-opts`。生成的 Clash 配置使用 `https://dns.alidns.com/dns-query` 查询 ECH 所需的 HTTPS DNS 记录
+- 若域名或源站 IP 变化，请同步更新 `src/worker.js` 中的 `ECH_SNI` / `ORIGIN_IP` 常量并重新部署 Worker
 
 ## License
 

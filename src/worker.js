@@ -215,10 +215,23 @@ function renderRaw(nodes) {
   return b64EncodeUtf8(lines.join('\n'));
 }
 
+// Enable ECH only for this Cloudflare-proxied hostname on its preferred IPs.
+const ECH_SNI = 'www.nicecc.ccwu.cc';
+const ORIGIN_IP = '107.174.250.250';
+
+function needsCloudflareEch(node) {
+  return node.tls === true &&
+    (node.network || 'ws') === 'ws' && Number(node.port) === 443 &&
+    node.server !== ORIGIN_IP &&
+    (node.sni || node.host) === ECH_SNI;
+}
+
 function renderClash(nodes) {
+  const needsEchDns = nodes.some(needsCloudflareEch);
   const proxies = nodes
     .map((node) => {
       if (node.type === 'vmess') {
+        const useEch = needsCloudflareEch(node);
         const lines = [
           `  - name: "${escapeYaml(node.name)}"`,
           `    type: vmess`,
@@ -232,8 +245,11 @@ function renderClash(nodes) {
           `    network: ${node.network || 'ws'}`,
         ];
 
-        if (node.sni) {
-          lines.push(`    servername: "${escapeYaml(node.sni)}"`);
+        if (node.sni || useEch) {
+          lines.push(`    servername: "${escapeYaml(node.sni || ECH_SNI)}"`);
+        }
+        if (useEch) {
+          lines.push('    client-fingerprint: chrome', '    ech-opts:', '      enable: true');
         }
 
         if ((node.network || 'ws') === 'ws') {
@@ -249,6 +265,7 @@ function renderClash(nodes) {
       }
 
       if (node.type === 'vless') {
+        const useEch = needsCloudflareEch(node);
         const lines = [
           `  - name: "${escapeYaml(node.name)}"`,
           `    type: vless`,
@@ -260,8 +277,11 @@ function renderClash(nodes) {
           `    network: ${node.network || 'ws'}`,
         ];
 
-        if (node.sni) {
-          lines.push(`    servername: "${escapeYaml(node.sni)}"`);
+        if (node.sni || useEch) {
+          lines.push(`    servername: "${escapeYaml(node.sni || ECH_SNI)}"`);
+        }
+        if (useEch) {
+          lines.push('    client-fingerprint: chrome', '    ech-opts:', '      enable: true');
         }
 
         if ((node.network || 'ws') === 'ws') {
@@ -277,6 +297,7 @@ function renderClash(nodes) {
       }
 
       if (node.type === 'trojan') {
+        const useEch = needsCloudflareEch(node);
         const lines = [
           `  - name: "${escapeYaml(node.name)}"`,
           `    type: trojan`,
@@ -286,8 +307,11 @@ function renderClash(nodes) {
           `    udp: true`,
         ];
 
-        if (node.sni) {
-          lines.push(`    sni: "${escapeYaml(node.sni)}"`);
+        if (node.sni || useEch) {
+          lines.push(`    sni: "${escapeYaml(node.sni || ECH_SNI)}"`);
+        }
+        if (useEch) {
+          lines.push('    client-fingerprint: chrome', '    ech-opts:', '      enable: true');
         }
 
         if (node.tls !== false) {
@@ -332,6 +356,12 @@ function renderClash(nodes) {
     `mode: rule`,
     `log-level: info`,
     `ipv6: true`,
+    ...(needsEchDns ? [
+      `dns:`,
+      `  enable: true`,
+      `  nameserver:`,
+      `    - https://dns.alidns.com/dns-query`,
+    ] : []),
     ``,
     `proxies:`,
     ...(proxies.length ? proxies : []),
